@@ -1,4 +1,3 @@
-import rpio from 'rpio'
 import sleep from 'sleep'
 import SoftSPI from 'rpi-softspi'
 
@@ -135,21 +134,18 @@ class PN532 {
       mosi: this.mosi,
       miso: this.miso,
       client: this.client,
-      // clientSelect: rpio.LOW,
       // mode: this.clockMode,
       bitOrder: this.bitOrder
     })
   }
 
   _spiOpen() {
-    // this.spi.mode = rpio.LOW
     this.spi.open()
     sleep.msleep(2)
   }
 
   _spiClose() {
     this.spi.close()
-    // this.spi.mode = rpio.HIGH
   }
 
   // Add two values as unsigned 8-bit values

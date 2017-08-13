@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "description": "PN532 SPI",
   "main": "index.js",
+  "url": "https://github.com/zachwalton/pn532-spi-js",
   "scripts": {
-    "run": "babel-node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "zach walton",
   "license": "MIT",

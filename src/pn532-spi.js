@@ -1,7 +1,8 @@
-import SoftSPI from 'rpi-softspi'
+import rpio from 'rpio'
 import sleep from 'sleep'
+import SoftSPI from 'rpi-softspi'
 
-const PN532_FRAME_LENGTH
+const PN532_FRAME_LENGTH = 8
 
 const PN532_PREAMBLE                      = 0x00
 const PN532_STARTCODE1                    = 0x00
@@ -114,17 +115,18 @@ const PN532_GPIO_P33                      = 3
 const PN532_GPIO_P34                      = 4
 const PN532_GPIO_P35                      = 5
 
-const PN532_ACK                           = [0x01, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00]
-const PN532_FRAME_START                   = [0x01, 0x00, 0x00, 0xFF]
+const PN532_ACK                           = Uint8Array.from([0x01, 0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00])
+const PN532_FRAME_START                   = Uint8Array.from([0x01, 0x00, 0x00, 0xFF])
 
 class PN532 {
-  constructor(client, clock, mosi, miso) {
-    this.client = client // CS (client select) pin
-    this.clock = clock   // SCLK pin
-    this.mosi = mosi     // MOSI pin
-    this.miso = miso     // MISO pin
+  constructor(options) {
+    this.client = options.client // CS (client select) pin
+    this.clock = options.clock   // SCLK pin
+    this.mosi = options.mosi     // MOSI pin
+    this.miso = options.miso     // MISO pin
+    this.debug = options.debug || false
 
-    this.clockMode = 0           // Clock mode (0-3) 
+    this.clockMode = 0           // Clock mode (0-3)
     this.bitOrder = SoftSPI.LSB  // Bit order, least significant first
 
     // Initialize bit bang SPI
@@ -133,21 +135,21 @@ class PN532 {
       mosi: this.mosi,
       miso: this.miso,
       client: this.client,
-      clientSelect: rpio.LOW,
-      mode: this.clockMode,
+      // clientSelect: rpio.LOW,
+      // mode: this.clockMode,
       bitOrder: this.bitOrder
     })
   }
 
   _spiOpen() {
-    this.spi.mode = rpio.LOW
-    sleep.msleep(2)
+    // this.spi.mode = rpio.LOW
     this.spi.open()
+    sleep.msleep(2)
   }
 
   _spiClose() {
     this.spi.close()
-    this.spi.mode = rpio.HIGH
+    // this.spi.mode = rpio.HIGH
   }
 
   // Add two values as unsigned 8-bit values
@@ -158,19 +160,19 @@ class PN532 {
   // Write a frame to the PN532 with the specified data bytearray.
   _writeFrame(data) {
     let length = data.length
-    if (!0 < data.length < 255) {
+    if (!(0 < data.length < 255)) {
       throw 'Data must be array of 1 to 255 bytes'
     }
 
-	  // Build frame to send as:
-		// - SPI data write (0x01)
-		// - Preamble (0x00)
-		// - Start code  (0x00, 0xFF)
-		// - Command length (1 byte)
-		// - Command length checksum
-		// - Command bytes
-		// - Checksum
-		// - Postamble (0x00)
+    // Build frame to send as:
+    // - SPI data write (0x01)
+    // - Preamble (0x00)
+    // - Start code  (0x00, 0xFF)
+    // - Command length (1 byte)
+    // - Command length checksum
+    // - Command bytes
+    // - Checksum
+    // - Postamble (0x00)
     let frame = [
       PN532_SPI_DATAWRITE,
       PN532_PREAMBLE,
@@ -180,12 +182,13 @@ class PN532 {
       this._uint8Add(~length, 1),
     ].concat(data)
 
-    let checksum = data.reduce(this._uint8Add, data, 0xFF)
+    let checksum = data.reduce(this._uint8Add, 0xFF)
 
     frame.push(~checksum & 0xFF)
     frame.push(PN532_POSTAMBLE)
 
-    console.log('Writing frame: ', frame)
+    if (this.debug) console.log('Writing frame: ', frame)
+
     this._spiOpen()
     this.spi.write(frame)
     this._spiClose()
@@ -194,7 +197,8 @@ class PN532 {
   // Read count bytes from the PN532
   _readData(count) {
     // Build a read request frame
-    frame = [PN532_SPI_DATAREAD]
+    let frame = new Uint8Array(count)
+    frame[0] = PN532_SPI_DATAREAD
 
     // Send the frame and return the response, ignoring the SPI header byte
     this._spiOpen()
@@ -204,14 +208,14 @@ class PN532 {
     return response
   }
 
-	// Read a response frame from the PN532 of at most length bytes in size.
-	// Returns the data inside the frame if found, otherwise raises an exception
-	// if there is an error parsing the frame.  Note that less than length bytes
-	// might be returned!
+  // Read a response frame from the PN532 of at most length bytes in size.
+  // Returns the data inside the frame if found, otherwise raises an exception
+  // if there is an error parsing the frame.  Note that less than length bytes
+  // might be returned!
   _readFrame(length) {
     // Read length + frame length
-    let response = _readData(length + PN532_FRAME_LENGTH)
-    console.log('Read frame: ', response)
+    let response = this._readData(length + PN532_FRAME_LENGTH)
+    if (this.debug) console.log('Read frame: ', response)
 
     // Check frame starts with 0x01 and then has 0x00FF (preceeded by optional
     // zeros).
@@ -242,7 +246,7 @@ class PN532 {
 
     // Check frame checksum value matches bytes
     let data = response.slice(offset + 2, offset + 2 + frameLen + 1)
-    let checksum = data.reduce(this._uint8Add, data, 0)
+    let checksum = data.reduce(this._uint8Add, 0)
     if (checksum != 0) {
       throw 'Response checksum did not match expected value!'
     }
@@ -251,21 +255,21 @@ class PN532 {
     return data.slice(0, data.length - 1)
   }
 
-	// Wait until the PN532 is ready to receive commands.  At most wait
+  // Wait until the PN532 is ready to receive commands.  At most wait
   // timeoutSeconds seconds for the PN532 to be ready.  If the PN532 is ready
-	// before the timeout is exceeded then true will be returned, otherwise
-	// false is returned when the timeout is exceeded
+  // before the timeout is exceeded then true will be returned, otherwise
+  // false is returned when the timeout is exceeded
   _waitReady(timeoutSeconds=1) {
     let start = new Date()
 
     // Send a SPI status read command and read response
     this._spiOpen()
-    let response = self.spi.transfer([PN532_SPI_STATREAD, 0x00])
+    let response = this.spi.transfer([PN532_SPI_STATREAD, 0x00])
     this._spiClose()
 
     // Loop until a ready response is received
     while (response[1] != PN532_SPI_READY) {
-      if (new Date() - start >= timeoutSeconds) return false
+      if (new Date() - start >= timeoutSeconds * 1000) return false
 
       // Wait a little while and try reading the status again
       sleep.msleep(10)
@@ -295,16 +299,16 @@ class PN532 {
     if (!this._waitReady(timeoutSeconds)) return null
 
     // Verify ACK response and wait to be ready for function response
-    let response = this._readData(len(PN532_ACK))
-    if (response != PN532_ACK) {
+    let response = this._readData(PN532_ACK.length)
+    if (response.toString() != PN532_ACK.toString()) {
       throw 'Did not receive expected ACK from PN532!'
     }
-    if (!self._waitReady(timeoutSeconds)) return null
+    if (!this._waitReady(timeoutSeconds)) return null
 
     response = this._readFrame(responseLength + 2)
 
     // Check that response is for the called function
-    if (!(response[0] == PN532_PN532TOHOST && response[1] == (command + 1)) {
+    if (!(response[0] == PN532_PN532TOHOST && response[1] == (command + 1))) {
       throw 'Received unexpected command response!'
     }
 
@@ -338,11 +342,11 @@ class PN532 {
   // Configure the PN532 to read MiFare cards
   samConfiguration() {
     // Send SAM configuration command with configuration for:
-		// - 0x01, normal mode
-		// - 0x14, timeout 50ms * 20 = 1 second
-		// - 0x01, use IRQ pin
-		// Note that no other verification is necessary as call_function will
-		// check the command was executed as expected
+    // - 0x01, normal mode
+    // - 0x14, timeout 50ms * 20 = 1 second
+    // - 0x01, use IRQ pin
+    // Note that no other verification is necessary as call_function will
+    // check the command was executed as expected
     this.callFunction(PN532_COMMAND_samCONFIGURATION, 0, [0x01, 0x14, 0x01])
   }
 
@@ -384,9 +388,7 @@ class PN532 {
       0x01, // Max card numbers
       keyNumber & 0xFF,
       blockNumber & 0xFF,
-    ]
-    params.push(key)
-    params.push(uid)
+    ].concat(key).concat(uid)
 
     // Send InDataExchange request and verify response is 0x00
     let response = this.callFunction(PN532_COMMAND_INDATAEXCHANGE,
@@ -401,7 +403,7 @@ class PN532 {
   // not read then null will be returned
   mifareClassicReadBlock(blockNumber) {
     // Send InDataExchange request to read block of MiFare data
-    let response = self.callFunction(PN532_COMMAND_INDATAEXCHANGE,
+    let response = this.callFunction(PN532_COMMAND_INDATAEXCHANGE,
                                      17,
                                      [0x01, MIFARE_CMD_READ, blockNumber & 0xFF])
     // Check first response is 0x00 to show success
@@ -422,7 +424,7 @@ class PN532 {
 
     // Build parameters for InDataExchange command to do MiFare classic write
     params = [
-      0x01, # Max card numbers
+      0x01, // Max card numbers
       MIFARE_CMD_WRITE,
       blockNumber & 0xFF,
     ].concat(data)
@@ -435,3 +437,5 @@ class PN532 {
     return (response[0] == 0x00)
   }
 }
+
+export default PN532

@@ -1,6 +1,6 @@
 {
   "name": "pn532-spi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PN532 SPI",
   "main": "index.js",
   "url": "https://github.com/zachwalton/pn532-spi-js",
@@ -16,5 +16,8 @@
     "babel-cli": "^6.6.4",
     "babel-preset-es2015": "^6.24.1",
     "babel-preset-latest": "^6.24.1"
+  },
+  "directories": {
+    "lib": "./lib"
   }
 }

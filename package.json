@@ -1,6 +1,6 @@
 {
   "name": "pn532-spi",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "PN532 SPI",
   "main": "index.js",
   "url": "https://github.com/zachwalton/pn532-spi-js",

@@ -19,15 +19,12 @@ Note: This needs to either run as root or with the appropriate capabilities set 
 
 import PN532 from 'pn532-spi'
 
-// https://gist.github.com/amorri40/3430429
-let hexChar = ["0", "1", "2", "3", "4", "5", "6", "7","8", "9", "A", "B", "C", "D", "E", "F"]
-
-let byteToHex = function(b) {
-  return hexChar[(b >> 4) & 0x0f] + hexChar[b & 0x0f]
-}
-
 let bytesToHex = function(arr) {
-  return arr.reduce(function(a, b) { return a + byteToHex(b) }, '0x')
+  return arr.reduce(function(a, b) {
+    let result = b.toString(16)
+    if (result.length == 1) result = '0' + result
+    return a + result
+  }, '0x')
 }
 
 let pn532 = new PN532({

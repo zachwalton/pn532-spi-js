@@ -1,6 +1,6 @@
 {
   "name": "pn532-spi",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "PN532 SPI",
   "main": "index.js",
   "url": "https://github.com/zachwalton/pn532-spi-js",
@@ -9,7 +9,7 @@
   "author": "zach walton",
   "license": "MIT",
   "dependencies": {
-    "rpi-softspi": "^1.0.4",
+    "rpi-softspi": "^1.0.5",
     "sleep": "^5.1.1"
   },
   "devDependencies": {
